@@ -93,12 +93,6 @@ label{display:block;font-size:14px;font-weight:500;margin:0 0 8px}
   border:0;outline:0;background:transparent;
   font-size:14px;color:var(--text)
 }
-.position-box{
-  display:flex;gap:6px;align-items:center;
-  margin:-5px 0 18px;color:#64748b;font-size:12px
-}
-.position-box .material-icons-round{font-size:17px;color:var(--pink)}
-.position-box strong{color:#be185d;font-weight:500}
 .status-grid{
   display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
   gap:8px;margin:0 0 20px
@@ -153,6 +147,14 @@ label{display:block;font-size:14px;font-weight:500;margin:0 0 8px}
   background:linear-gradient(135deg,#ec4899,#be185d);
   display:flex;align-items:center;justify-content:center;gap:8px;
   box-shadow:0 6px 18px rgba(194,24,91,.22)
+}
+.btn-bio-trigger.leave-btn{
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  box-shadow:0 6px 18px rgba(217,119,6,.22)
+}
+.btn-bio-trigger.trip-btn{
+  background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+  box-shadow:0 6px 18px rgba(29,78,216,.22)
 }
 .gps-info{
   display:flex;align-items:center;gap:8px;
@@ -315,9 +317,9 @@ footer{
 <section id="attendanceTab">
   <div class="section-head">
     <h2>บันทึกการปฏิบัติราชการ</h2>
-    <p>สแกนลายนิ้วมือ / Face ID เพื่อลงเวลาอัตโนมัติ</p>
+    <p>สแกนลายนิ้วมือ / Face ID เพื่อบันทึกข้อมูลอัตโนมัติ</p>
   </div>
-  <form id="attendanceForm" onsubmit="submitAttendance(event)">
+  <form id="attendanceForm" onsubmit="event.preventDefault()">
     <label for="customDate">วันที่ปฏิบัติราชการ</label>
     <div class="input-box">
       <span class="material-icons-round">calendar_month</span>
@@ -349,21 +351,6 @@ footer{
       </label>
     </div>
 
-    <!-- เลือกชื่อ-นามสกุล (แสดงเฉพาะกรณี ลา หรือ ไปราชการ) -->
-    <div id="manualEmployeeArea" class="hidden">
-      <label for="employee">ชื่อ–นามสกุล</label>
-      <div class="input-box">
-        <span class="material-icons-round">person</span>
-        <select id="employee" onchange="updatePosition()">
-          <option value="">กำลังโหลดรายชื่อ...</option>
-        </select>
-      </div>
-      <div class="position-box">
-        <span class="material-icons-round">badge</span>
-        ตำแหน่ง: <strong id="displayPosition">-</strong>
-      </div>
-    </div>
-
     <!-- รายละเอียดการลา -->
     <div id="leaveTypeArea" class="conditional hidden">
       <label for="leaveType">ประเภทการลา</label>
@@ -393,7 +380,7 @@ footer{
       </div>
     </div>
 
-    <!-- กล่องสแกนลายนิ้วมือ / Face ID ของเครื่อง -->
+    <!-- กล่องสแกนลายนิ้วมือ / Face ID (ใช้ร่วมกันทุกสถานะ) -->
     <div id="biometricContainer" class="bio-card">
       <div id="deviceStatusBadge" class="status-pill">
         <span class="material-icons-round" style="font-size:15px">fingerprint</span>
@@ -410,21 +397,16 @@ footer{
         </div>
       </div>
 
-      <button type="button" id="btnBioScan" class="btn-bio-trigger" onclick="handleWebAuthnCheckIn()">
+      <button type="button" id="btnBioScan" class="btn-bio-trigger" onclick="handleWebAuthnAction()">
         <span class="material-icons-round" style="font-size:24px">fingerprint</span>
-        <span>สแกนลายนิ้วมือ / Face ID เพื่อลงเวลา</span>
+        <span id="btnBioText">สแกนลายนิ้วมือ / Face ID เพื่อลงเวลา</span>
       </button>
     </div>
 
     <div id="gpsInfo" class="gps-info">
       <span class="material-icons-round">my_location</span>
-      <span>การมาปฏิบัติงานต้องอยู่ภายในพื้นที่ GPS ที่โรงเรียนกำหนด</span>
+      <span id="gpsInfoText">การมาปฏิบัติงานต้องอยู่ภายในพื้นที่ GPS ที่โรงเรียนกำหนด</span>
     </div>
-
-    <button type="submit" id="btnSubmit" class="btn-main hidden">
-      <span class="material-icons-round">save</span>
-      <span id="submitText">บันทึกข้อมูล</span>
-    </button>
   </form>
 </section>
 
@@ -565,7 +547,6 @@ function showToast(message,error=false){
 function setLoading(state,message){
   busy=state;
   $('loading').classList.toggle('hidden',!state);
-  $('btnSubmit').disabled=state;
   $('btnPrint').disabled=state;
   $('btnBioScan').disabled=state;
   if(message)$('loadingText').textContent=message;
@@ -665,26 +646,18 @@ async function loadInitialData(){
     img.onerror=()=>{img.style.display='none';fallback.style.display='block';};
     if(data.logo)img.src=data.logo;
   }catch(err){
-    $('employee').innerHTML='<option value="">โหลดข้อมูลไม่สำเร็จ</option>';
     showToast(err.message,true);
   }
 }
 
 function populateEmployeeSelects(){
-  const select=$('employee');
   const enrollSelect=$('enrollEmployee');
-  select.innerHTML='<option value="">-- เลือกชื่อบุคลากร --</option>';
   enrollSelect.innerHTML='<option value="">-- เลือกบุคลากรที่จะลงทะเบียน --</option>';
   staff.forEach(p=>{
-    const opt1=document.createElement('option');
-    opt1.value=p.name;
-    opt1.textContent=p.name;
-    select.appendChild(opt1);
-
-    const opt2=document.createElement('option');
-    opt2.value=p.name;
-    opt2.textContent=p.name+(p.hasDevice?' (ลงทะเบียนแล้ว)':' (ยังไม่ลงทะเบียน)');
-    enrollSelect.appendChild(opt2);
+    const opt=document.createElement('option');
+    opt.value=p.name;
+    opt.textContent=p.name+(p.hasDevice?' (ลงทะเบียนแล้ว)':' (ยังไม่ลงทะเบียน)');
+    enrollSelect.appendChild(opt);
   });
 }
 
@@ -758,7 +731,8 @@ async function registerWebAuthnBiometric(){
   }
 }
 
-async function handleWebAuthnCheckIn(){
+/* สแกนลายนิ้วมือ / Face ID สำหรับทุกสถานะ (มาปฏิบัติงาน, ลา, ไปราชการ) */
+async function handleWebAuthnAction(){
   if(busy)return;
   const saved=getSavedCredential();
   if(!saved||!saved.name||!saved.credentialId){
@@ -767,9 +741,18 @@ async function handleWebAuthnCheckIn(){
     return;
   }
 
+  const entryType=selectedType();
   const customDate=$('customDate').value;
   if(!customDate)return showToast('กรุณาเลือกวันที่',true);
   if(customDate>localDateString())return showToast('ไม่อนุญาตให้เลือกวันอนาคต',true);
+
+  // ตรวจสอบช่องกรอกข้อมูลก่อนเรียกเซ็นเซอร์สแกนนิ้ว
+  if(entryType==='ลา'&&!$('leaveType').value){
+    return showToast('กรุณาเลือกประเภทการลา',true);
+  }
+  if(entryType==='ไปราชการ'&&(!$('tripSubject').value.trim()||!$('tripLocation').value.trim())){
+    return showToast('กรุณาระบุเรื่องและสถานที่ไปราชการ',true);
+  }
 
   try{
     const challenge=new Uint8Array(32);
@@ -791,27 +774,37 @@ async function handleWebAuthnCheckIn(){
 
     if(!assertion)throw Error('การยืนยันตัวตนล้มเหลว');
 
-    setLoading(true,'สแกนลายนิ้วมือสำเร็จ กำลังตรวจสอบ GPS...');
-    const loc=await getLocation();
+    let lat=null,lng=null;
+    if(entryType==='มาปฏิบัติงาน'){
+      setLoading(true,'สแกนลายนิ้วมือสำเร็จ กำลังตรวจสอบ GPS...');
+      const loc=await getLocation();
+      lat=loc.latitude;
+      lng=loc.longitude;
+    }else{
+      setLoading(true,'สแกนลายนิ้วมือสำเร็จ กำลังบันทึกข้อมูล...');
+    }
 
-    $('loadingText').textContent='กำลังบันทึกเวลาของ '+saved.name+'...';
+    $('loadingText').textContent='กำลังบันทึกข้อมูลของ '+saved.name+'...';
     const res=await callGasPost({
       action:'recordAttendance',
       data:{
         employeeName:saved.name,
-        entryType:'มาปฏิบัติงาน',
+        entryType:entryType,
         customDate:customDate,
-        leaveType:'',
-        tripSubject:'',
-        tripLocation:'',
+        leaveType:$('leaveType').value,
+        tripSubject:$('tripSubject').value.trim(),
+        tripLocation:$('tripLocation').value.trim(),
         credentialId:saved.credentialId,
-        latitude:loc.latitude,
-        longitude:loc.longitude
+        latitude:lat,
+        longitude:lng
       }
     });
 
     setLoading(false);
     showToast(res.message||'บันทึกสำเร็จ');
+    $('leaveType').value='';
+    $('tripSubject').value='';
+    $('tripLocation').value='';
   }catch(err){
     setLoading(false);
     if(err.name==='NotAllowedError'){
@@ -822,23 +815,31 @@ async function handleWebAuthnCheckIn(){
   }
 }
 
-function updatePosition(){
-  const person=staff.find(p=>p.name===$('employee').value);
-  $('displayPosition').textContent=person?person.position:'-';
-}
 function selectedType(){
   return document.querySelector('input[name="et"]:checked').value;
 }
 function toggleFields(){
   const type=selectedType();
-  const isPresent=type==='มาปฏิบัติงาน';
-  $('biometricContainer').classList.toggle('hidden',!isPresent);
-  $('gpsInfo').classList.toggle('hidden',!isPresent);
-  $('manualEmployeeArea').classList.toggle('hidden',isPresent);
-  $('btnSubmit').classList.toggle('hidden',isPresent);
+  const btn=$('btnBioScan');
+  const btnText=$('btnBioText');
+  const gpsText=$('gpsInfoText');
+
   $('leaveTypeArea').classList.toggle('hidden',type!=='ลา');
   $('tripDetailsArea').classList.toggle('hidden',type!=='ไปราชการ');
-  $('submitText').textContent=type==='ลา'?'บันทึกการลา':'บันทึกไปราชการ';
+
+  btn.classList.remove('leave-btn','trip-btn');
+  if(type==='มาปฏิบัติงาน'){
+    btnText.textContent='สแกนลายนิ้วมือ / Face ID เพื่อลงเวลา';
+    gpsText.textContent='การมาปฏิบัติงานต้องอยู่ภายในพื้นที่ GPS ที่โรงเรียนกำหนด';
+  }else if(type==='ลา'){
+    btn.classList.add('leave-btn');
+    btnText.textContent='สแกนลายนิ้วมือ / Face ID เพื่อบันทึกการลา';
+    gpsText.textContent='การแจ้งลาสามารถบันทึกได้จากทุกสถานที่ (ไม่จำกัดพิกัด GPS)';
+  }else{
+    btn.classList.add('trip-btn');
+    btnText.textContent='สแกนลายนิ้วมือ / Face ID เพื่อบันทึกไปราชการ';
+    gpsText.textContent='การแจ้งไปราชการสามารถบันทึกได้จากทุกสถานที่ (ไม่จำกัดพิกัด GPS)';
+  }
 }
 function switchTab(tab){
   $('attendanceTab').classList.toggle('hidden',tab!=='attendance');
@@ -859,45 +860,6 @@ function getLocation(){
       {enableHighAccuracy:true,timeout:15000,maximumAge:0}
     );
   });
-}
-
-async function submitAttendance(event){
-  event.preventDefault();
-  if(busy)return;
-  const entryType=selectedType();
-  if(entryType==='มาปฏิบัติงาน')return;
-
-  const employeeName=$('employee').value;
-  const customDate=$('customDate').value;
-  if(!employeeName)return showToast('กรุณาเลือกชื่อบุคลากร',true);
-  if(!customDate)return showToast('กรุณาเลือกวันที่',true);
-  if(customDate>localDateString())return showToast('ไม่อนุญาตให้เลือกวันอนาคต',true);
-  if(entryType==='ลา'&&!$('leaveType').value)return showToast('กรุณาเลือกประเภทการลา',true);
-  if(entryType==='ไปราชการ'&&(!$('tripSubject').value.trim()||!$('tripLocation').value.trim())){
-    return showToast('กรุณาระบุเรื่องและสถานที่ไปราชการ',true);
-  }
-
-  setLoading(true,'กำลังบันทึกข้อมูล...');
-  try{
-    const res=await callGasPost({
-      action:'recordAttendance',
-      data:{
-        employeeName,entryType,customDate,
-        leaveType:$('leaveType').value,
-        tripSubject:$('tripSubject').value.trim(),
-        tripLocation:$('tripLocation').value.trim(),
-        latitude:null,longitude:null
-      }
-    });
-    setLoading(false);
-    showToast(res.message||'บันทึกสำเร็จ');
-    $('leaveType').value='';
-    $('tripSubject').value='';
-    $('tripLocation').value='';
-  }catch(err){
-    setLoading(false);
-    showToast(err.message||'บันทึกข้อมูลไม่สำเร็จ',true);
-  }
 }
 
 async function loadDashboard(){
