@@ -294,7 +294,7 @@ footer{
 <div class="app">
 <header class="header">
   <button type="button" class="admin-enroll-btn" onclick="openEnrollModal()">
-    <span class="material-icons-round">fingerprint</span> ลงทะเบียนลายนิ้วมือ
+    <span class="material-icons-round">fingerprint</span> ลงทะเบียน / เปลี่ยนเครื่อง
   </button>
   <div class="brand-icon">
     <img id="schoolLogo" alt="โลโก้โรงเรียน" style="width:100%;height:100%;object-fit:contain;border-radius:50%;display:none">
@@ -491,27 +491,27 @@ footer{
 <footer>พัฒนาระบบโดย นายหุสนัน เจ๊ะเตะ ครูโรงเรียนบ้านปงตา</footer>
 </div>
 
-<!-- หน้าต่างลงทะเบียนลายนิ้วมือ / Face ID -->
+<!-- หน้าต่างลงทะเบียนลายนิ้วมือ / เปลี่ยนเครื่องด้วย PIN 4 หลัก -->
 <div id="enrollModal" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-head">
-      <h3>ลงทะเบียนลายนิ้วมือ / Face ID</h3>
+      <h3>ลงทะเบียน / เปลี่ยนเครื่องใหม่</h3>
       <button type="button" class="close-modal" onclick="closeEnrollModal()">
         <span class="material-icons-round">close</span>
       </button>
     </div>
     <p style="font-size:12px;color:#64748b;margin:0 0 14px">
-      เปิดบน <strong>มือถือส่วนตัวของบุคลากร</strong> เลือกชื่อ ใส่รหัสแอดมิน แล้วกดปุ่มด้านล่างเพื่อสแกนลายนิ้วมือหรือ Face ID ของเครื่อง
+      เลือกชื่อของคุณและกรอก <strong>รหัส PIN 4 หลักส่วนตัว</strong> (รหัสเดียวกับ PTS Portal) เพื่อผูกอุปกรณ์นี้ (หากเคยลงทะเบียนเครื่องอื่นไว้ เครื่องเดิมจะถูกยกเลิกสิทธิ์อัตโนมัติ)
     </p>
     <label for="enrollEmployee">เลือกชื่อบุคลากร</label>
     <div class="input-box">
       <span class="material-icons-round">person</span>
       <select id="enrollEmployee"></select>
     </div>
-    <label for="adminPinInput">รหัสผ่านผู้ดูแลระบบ (ADMIN PIN)</label>
+    <label for="teacherPinInput">รหัส PIN 4 หลักส่วนตัว</label>
     <div class="input-box">
       <span class="material-icons-round">lock</span>
-      <input id="adminPinInput" type="password" placeholder="ระบุรหัสผ่านผู้ดูแลระบบ">
+      <input id="teacherPinInput" type="password" inputmode="numeric" maxlength="4" placeholder="กรอกรหัส PIN 4 หลักของคุณ">
     </div>
     <button type="button" id="btnRegisterBio" class="btn-main" onclick="registerWebAuthnBiometric()">
       <span class="material-icons-round">fingerprint</span> สแกนลายนิ้วมือ / Face ID เพื่อลงทะเบียน
@@ -670,9 +670,9 @@ function closeEnrollModal(){
 
 async function registerWebAuthnBiometric(){
   const name=$('enrollEmployee').value;
-  const adminPin=$('adminPinInput').value.trim();
+  const teacherPin=$('teacherPinInput').value.trim();
   if(!name)return showToast('กรุณาเลือกชื่อบุคลากร',true);
-  if(!adminPin)return showToast('กรุณากรอกรหัสผ่านผู้ดูแลระบบ',true);
+  if(!/^\d{4}$/.test(teacherPin))return showToast('กรุณากรอกรหัส PIN 4 หลักของคุณ',true);
 
   if(!window.PublicKeyCredential||!navigator.credentials){
     return showToast('เบราว์เซอร์นี้ไม่รองรับการสแกนลายนิ้วมือ กรุณาเปิดผ่าน Chrome หรือ Safari',true);
@@ -707,17 +707,17 @@ async function registerWebAuthnBiometric(){
     }
 
     const credentialId=bufferToBase64Url(cred.rawId);
-    setLoading(true,'กำลังบันทึกข้อมูลลงฐานข้อมูลโรงเรียน...');
+    setLoading(true,'กำลังตรวจสอบ PIN และบันทึกข้อมูลลงฐานข้อมูล...');
     const res=await callGasPost({
       action:'registerDevice',
       employeeName:name,
       devicePayload:{credentialId},
-      adminPin:adminPin
+      teacherPin:teacherPin
     });
 
     setLoading(false);
     setSavedCredential({name,credentialId});
-    $('adminPinInput').value='';
+    $('teacherPinInput').value='';
     closeEnrollModal();
     showToast(res.message);
     loadInitialData();
@@ -746,7 +746,6 @@ async function handleWebAuthnAction(){
   if(!customDate)return showToast('กรุณาเลือกวันที่',true);
   if(customDate>localDateString())return showToast('ไม่อนุญาตให้เลือกวันอนาคต',true);
 
-  // ตรวจสอบช่องกรอกข้อมูลก่อนเรียกเซ็นเซอร์สแกนนิ้ว
   if(entryType==='ลา'&&!$('leaveType').value){
     return showToast('กรุณาเลือกประเภทการลา',true);
   }
